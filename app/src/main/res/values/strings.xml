@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">跳绳计数</string>
+
+    <!-- 首页 -->
+    <string name="home_subtitle">选择一种模式开始</string>
+    <string name="label_player">运动员</string>
+    <string name="hint_player_name">输入名字（成绩将记录在该名下）</string>
+    <string name="btn_records">成绩记录</string>
+    <string name="mode_time">计时模式</string>
+    <string name="mode_time_desc">固定时长，统计跳绳个数</string>
+    <string name="mode_count">计数模式</string>
+    <string name="mode_count_desc">固定目标个数，统计用时</string>
+
+    <!-- 计数页 -->
+    <string name="title_mode_time">计时模式 · 固定时间计个数</string>
+    <string name="title_mode_count">计数模式 · 固定个数计时间</string>
+    <string name="unit_minute">分</string>
+    <string name="unit_second">秒</string>
+    <string name="unit_count">个</string>
+    <string name="label_target">目标</string>
+    <string name="switch_sensor">摄像头自动计数（手机架好，全身含双脚入镜）</string>
+    <string name="switch_sensor_hint">关闭后请使用“跳一下 +1”按钮手动计数</string>
+    <string name="btn_start">开始</string>
+    <string name="btn_pause">暂停</string>
+    <string name="btn_resume">继续</string>
+    <string name="btn_stop">结束</string>
+    <string name="btn_manual_plus">跳一下 +1</string>
+    <string name="btn_again">再来一次</string>
+    <string name="btn_back">返回首页</string>
+    <string name="hint_target_time">目标时长 %1$s</string>
+    <string name="hint_target_count">目标 %1$d 个</string>
+    <string name="toast_min_time">时长至少 10 秒</string>
+    <string name="toast_camera_denied">未授予摄像头权限，无法自动计数，请使用手动计数</string>
+    <string name="toast_camera_fail">摄像头启动失败，请使用手动计数</string>
+
+    <!-- 播报文案 -->
+    <string name="speak_start">开始</string>
+    <string name="speak_pause">暂停</string>
+    <string name="speak_resume">继续</string>
+    <string name="speak_count">%1$d 个</string>
+    <string name="speak_ten_seconds_left">还剩十秒</string>
+    <string name="speak_last_ten">还剩十个，已用时 %1$s</string>
+    <string name="result_time_up">时间到！共跳 %1$d 个</string>
+    <string name="result_early_stop">提前结束，共跳 %1$d 个，用时 %2$s</string>
+    <string name="result_goal_done">目标完成！%1$d 个，用时 %2$s</string>
+    <string name="spoken_seconds">%1$d 秒</string>
+    <string name="spoken_minutes">%1$d 分</string>
+    <string name="spoken_minutes_seconds">%1$d 分 %2$d 秒</string>
+
+    <!-- 成绩记录 -->
+    <string name="records_title">成绩记录</string>
+    <string name="records_empty">暂无成绩，先跳一组吧</string>
+    <string name="records_best_header">各档位最佳</string>
+    <string name="records_all_header">全部记录</string>
+    <string name="btn_clear_records">清空记录</string>
+    <string name="confirm_clear_records">确定删除所有成绩记录吗？</string>
+    <string name="result_new_record">🎉 新纪录！</string>
+    <string name="result_best_line">本档最佳：%1$s</string>
+</resources>

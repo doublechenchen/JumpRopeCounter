@@ -1,0 +1,27 @@
+# ===== 敏感信息（绝不入库）=====
+jumprope.keystore
+keystore.properties
+local.properties
+
+# ===== Android 构建产物 =====
+*.iml
+.gradle/
+build/
+*/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# ===== IDE =====
+.idea/
+*.ipr
+*.iws
+.vscode/
+
+# ===== 系统 =====
+.DS_Store
+Thumbs.db
