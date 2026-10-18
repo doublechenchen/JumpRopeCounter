@@ -2,6 +2,14 @@
 
 一个原生 Android 跳绳计数 App（Kotlin + Material 3，minSdk 26 / targetSdk 34）。
 
+## 📲 下载安装
+
+**[点击下载最新版 APK](https://github.com/doublechenchen/JumpRopeCounter/releases/latest/download/JumpRopeCounter.apk)**
+
+或前往 [Releases 页面](https://github.com/doublechenchen/JumpRopeCounter/releases) 查看所有版本。
+
+安装方法：在安卓手机上下载后用文件管理器打开安装；提示「未知来源」属正常现象，选择「仍然安装」即可。覆盖旧版安装即升级，成绩记录保留。
+
 ## 功能
 
 ### 两种模式
@@ -42,13 +50,15 @@ gradlew assembleDebug
 
 ```
 app/src/main/java/com/cc/jumprope/
-├── MainActivity.kt    # 首页：模式选择
-└── CountActivity.kt   # 计数页：计时/计数逻辑、语音播报、传感器跳跃检测
+├── MainActivity.kt    # 首页：运动员名字、模式入口、记录入口
+├── CountActivity.kt   # 计数页：3-2-1 倒计时、姿态计数、语音播报、成绩保存
+├── RecordsActivity.kt # 成绩记录页：各档最佳 + 全部记录
+└── ScoreStore.kt      # 成绩存储（SharedPreferences + JSON，带防损坏保护）
 ```
 
 ## 灵敏度调优
 
 如果自动计数不准，调整 `CountActivity.kt` 顶部两个常量：
 
-- `AMP_MIN_RATIO = 0.08f` — 最小有效振幅（相对躯干长度），漏记就调小（如 0.05），误记就调大（如 0.12）
+- `AMP_MIN_RATIO = 0.05f` — 最小有效振幅（相对躯干长度），漏记就调小，误记就调大
 - `JUMP_REFRACTORY_MS = 300L` — 两次跳跃最小间隔，跳得快（>200 个/分钟）可调小到 250
