@@ -3,6 +3,13 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!-- 摄像头实时预览：全屏背景层（计数时可见） -->
+    <androidx.camera.view.PreviewView
+        android:id="@+id/previewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -92,22 +99,6 @@
                     android:textSize="18sp" />
             </LinearLayout>
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switchSensor"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:checked="true"
-                android:text="@string/switch_sensor"
-                android:textSize="16sp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="@string/switch_sensor_hint"
-                android:textSize="13sp" />
-
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnStart"
                 android:layout_width="match_parent"
@@ -117,7 +108,7 @@
                 android:textSize="22sp" />
         </LinearLayout>
 
-        <!-- ============ 运行区 ============ -->
+        <!-- ============ 运行区（叠加在全屏摄像头预览之上） ============ -->
         <LinearLayout
             android:id="@+id/groupRunning"
             android:layout_width="match_parent"
@@ -126,20 +117,17 @@
             android:orientation="vertical"
             android:visibility="gone">
 
-            <!-- 摄像头实时预览（摄像头计数时可见） -->
-            <androidx.camera.view.PreviewView
-                android:id="@+id/previewView"
-                android:layout_width="match_parent"
-                android:layout_height="280dp"
-                android:layout_marginBottom="16dp"
-                android:visibility="gone" />
-
             <TextView
                 android:id="@+id/tvTimer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:fontFamily="monospace"
+                android:shadowColor="#000000"
+                android:shadowDx="2"
+                android:shadowDy="2"
+                android:shadowRadius="6"
                 android:text="00:00"
+                android:textColor="#FFFFFF"
                 android:textSize="52sp" />
 
             <TextView
@@ -147,6 +135,11 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:shadowColor="#000000"
+                android:shadowDx="1"
+                android:shadowDy="1"
+                android:shadowRadius="4"
+                android:textColor="#FFFFFF"
                 android:textSize="15sp" />
 
             <TextView
@@ -154,16 +147,14 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginVertical="16dp"
+                android:shadowColor="#000000"
+                android:shadowDx="3"
+                android:shadowDy="3"
+                android:shadowRadius="8"
                 android:text="0"
+                android:textColor="#FFFFFF"
                 android:textSize="110sp"
                 android:textStyle="bold" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnManual"
-                android:layout_width="match_parent"
-                android:layout_height="96dp"
-                android:text="@string/btn_manual_plus"
-                android:textSize="24sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -228,6 +219,43 @@
 
     </LinearLayout>
     </ScrollView>
+
+    <!-- 等待运动员语音准备：全屏提示层 -->
+    <LinearLayout
+        android:id="@+id/groupWaitReady"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CCFFFFFF"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/wait_ready_title"
+            android:textColor="@color/green_800"
+            android:textSize="34sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/wait_ready_hint"
+            android:textSize="16sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSkipReady"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="64dp"
+            android:layout_marginTop="48dp"
+            android:text="@string/btn_skip_ready"
+            android:textSize="18sp" />
+    </LinearLayout>
 
     <!-- 开赛倒计时：全屏大字 3→2→1 -->
     <TextView

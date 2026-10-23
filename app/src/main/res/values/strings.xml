@@ -31,8 +31,14 @@
     <string name="hint_target_time">目标时长 %1$s</string>
     <string name="hint_target_count">目标 %1$d 个</string>
     <string name="toast_min_time">时长至少 10 秒</string>
-    <string name="toast_camera_denied">未授予摄像头权限，无法自动计数，请使用手动计数</string>
-    <string name="toast_camera_fail">摄像头启动失败，请使用手动计数</string>
+    <string name="toast_camera_denied">未授予摄像头权限，无法自动计数</string>
+    <string name="toast_camera_fail">摄像头启动失败</string>
+    <string name="toast_mic_denied">未授予麦克风权限，请点「直接开始」</string>
+
+    <!-- 语音准备 -->
+    <string name="wait_ready_title">请大声说：「我准备好了」</string>
+    <string name="wait_ready_hint">听到后自动倒数 3 秒开始</string>
+    <string name="btn_skip_ready">直接开始</string>
 
     <!-- 播报文案 -->
     <string name="speak_start">开始</string>

@@ -3,14 +3,20 @@ package com.cc.jumprope
 import android.Manifest
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
+import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.AudioRecord
 import android.media.MediaMetadataRetriever
+import android.media.MediaRecorder
 import android.media.SoundPool
 import android.media.ToneGenerator
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
@@ -32,7 +38,9 @@ import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.concurrent.thread
 import kotlin.math.abs
+import kotlin.math.sqrt
 
 /**
  * 计数页：
@@ -95,7 +103,8 @@ class CountActivity : AppCompatActivity() {
         R.raw.say_start, R.raw.say_pause, R.raw.say_resume,
         R.raw.say_last10s, R.raw.say_last10n, R.raw.say_used,
         R.raw.say_timeup, R.raw.say_goal, R.raw.say_early,
-        R.raw.say_total, R.raw.say_elapsed, R.raw.say_newrecord
+        R.raw.say_total, R.raw.say_elapsed, R.raw.say_newrecord,
+        R.raw.say_ready
     )
 
     // ---- 摄像头与姿态检测 ----
@@ -109,6 +118,12 @@ class CountActivity : AppCompatActivity() {
     private var cycleMax = Float.NaN      // 本周期最低点（画面 Y 最大）
     private var cameraAbove = false       // 当前是否处于“腾空”状态
     private var lastJumpAt = 0L
+
+    // ---- 语音准备（运动员说“我准备好了”后才倒数开始） ----
+    private var waitingReady = false      // 是否处于等待语音准备状态
+    private var listenArmedAt = 0L        // 提示音播完才开听，防止自我触发
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var vadRunning = false        // 降级方案：人声能量检测线程开关
 
     private val handler = Handler(Looper.getMainLooper())
     private val ticker = object : Runnable {
@@ -224,9 +239,9 @@ class CountActivity : AppCompatActivity() {
         binding.btnStart.setOnClickListener { onStartClicked() }
         binding.btnPause.setOnClickListener { togglePause() }
         binding.btnStop.setOnClickListener { finishCounting(manual = true) }
-        binding.btnManual.setOnClickListener { onJump() }
         binding.btnAgain.setOnClickListener { resetToSetup() }
         binding.btnBack.setOnClickListener { finish() }
+        binding.btnSkipReady.setOnClickListener { onReadyDetected() }
     }
 
     // ---------------- 权限 ----------------
@@ -235,12 +250,181 @@ class CountActivity : AppCompatActivity() {
         ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
 
+    private fun hasMicPermission() =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+
     private fun onStartClicked() {
-        if (binding.switchSensor.isChecked && !hasCameraPermission()) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), REQ_CAMERA)
+        val need = mutableListOf<String>()
+        if (!hasCameraPermission()) need.add(Manifest.permission.CAMERA)
+        if (!hasMicPermission()) need.add(Manifest.permission.RECORD_AUDIO)
+        if (need.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, need.toTypedArray(), REQ_CAMERA)
             return
         }
+        enterWaitReady()
+    }
+
+    // ---------------- 语音准备：说“我准备好了”触发倒数 ----------------
+
+    /** 进入等待状态：全屏提示 + 播报提示音 + 开始聆听 */
+    private fun enterWaitReady() {
+        waitingReady = true
+        binding.groupWaitReady.visibility = View.VISIBLE
+        speakParts(listOf(R.raw.say_ready))
+        if (!hasMicPermission()) {
+            Toast.makeText(this, R.string.toast_mic_denied, Toast.LENGTH_LONG).show()
+            return
+        }
+        // 提示音播完再开听，防止播报里的“准备”二字自我触发
+        listenArmedAt = SystemClock.elapsedRealtime() + (clipDurMs[R.raw.say_ready] ?: 1500L) + 500L
+        val recognizerOk = SpeechRecognizer.isRecognitionAvailable(this)
+        if (recognizerOk) {
+            startSpeechRecognizer()
+        } else {
+            startVad()
+        }
+    }
+
+    /** 首选方案：系统语音识别，匹配“准备/好了/开始”关键词 */
+    private fun startSpeechRecognizer() {
+        val sr = SpeechRecognizer.createSpeechRecognizer(this)
+        speechRecognizer = sr
+        sr.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+            override fun onPartialResults(partialResults: Bundle?) =
+                checkReadyResults(partialResults)
+            override fun onResults(results: Bundle?) = checkReadyResults(results)
+            override fun onError(error: Int) {
+                if (!waitingReady) return
+                if (error == SpeechRecognizer.ERROR_NO_MATCH ||
+                    error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                ) {
+                    restartSpeechRecognizer()   // 没听清就继续听
+                } else {
+                    // 识别服务实际不可用（如国行系统无识别引擎），降级为人声能量检测
+                    stopSpeechRecognizer()
+                    startVad()
+                }
+            }
+        })
+        sr.startListening(android.content.Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "zh-CN")
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+        })
+    }
+
+    private fun checkReadyResults(bundle: Bundle?) {
+        if (!waitingReady || SystemClock.elapsedRealtime() < listenArmedAt) return
+        val texts = bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION) ?: return
+        for (t in texts) {
+            if (t.contains("准备") || t.contains("好了") || t.contains("开始")) {
+                onReadyDetected()
+                return
+            }
+        }
+    }
+
+    private fun restartSpeechRecognizer() {
+        stopSpeechRecognizer()
+        if (waitingReady && speechRecognizer == null &&
+            SpeechRecognizer.isRecognitionAvailable(this)
+        ) {
+            startSpeechRecognizer()
+        }
+    }
+
+    private fun stopSpeechRecognizer() {
+        try {
+            speechRecognizer?.stopListening()
+            speechRecognizer?.destroy()
+        } catch (_: Exception) {
+        }
+        speechRecognizer = null
+    }
+
+    /** 降级方案：AudioRecord 人声能量检测——对着手机大声说话即可触发 */
+    private fun startVad() {
+        if (vadRunning) return
+        vadRunning = true
+        thread {
+            var rec: AudioRecord? = null
+            try {
+                val rate = 16000
+                val minBuf = AudioRecord.getMinBufferSize(
+                    rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
+                )
+                rec = AudioRecord(
+                    MediaRecorder.AudioSource.VOICE_RECOGNITION, rate,
+                    AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
+                    maxOf(minBuf, 4096)
+                )
+                rec.startRecording()
+                val buf = ShortArray(2048)   // 约 128ms 一帧
+                var hot = 0        // 连续超阈值帧数
+                var quiet = 0      // 开始说话后的连续安静帧数
+                var speechFrames = 0
+                var speaking = false
+                while (vadRunning && waitingReady) {
+                    val n = rec.read(buf, 0, buf.size)
+                    if (n <= 0) continue
+                    var sum = 0.0
+                    for (i in 0 until n) {
+                        val v = buf[i].toInt()
+                        sum += v * v
+                    }
+                    val rms = sqrt(sum / n)
+                    val nowMs = SystemClock.elapsedRealtime()
+                    if (nowMs < listenArmedAt) continue
+
+                    // 说完才触发：响亮持续 ≥3 帧视为开始说话，之后安静 ≥4 帧（约 0.5 秒）视为说完
+                    if (rms > 120) {
+                        hot++
+                        quiet = 0
+                        if (hot >= 3) speaking = true
+                        if (speaking) speechFrames++
+                    } else if (rms < 70 && speaking) {
+                        quiet++
+                        speechFrames++
+                    }
+                    if (speaking && (quiet >= 4 || speechFrames > 40)) {
+                        handler.post { onReadyDetected() }
+                        break
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("JumpRope", "VAD 异常", e)
+                // 麦克风不可用时只能点「直接开始」
+            } finally {
+                vadRunning = false
+                try {
+                    rec?.stop()
+                    rec?.release()
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
+    /** 听到准备口令：停止聆听，隐藏提示层，进入 3→2→1 倒数 */
+    private fun onReadyDetected() {
+        if (!waitingReady) return
+        waitingReady = false
+        stopReadyListening()
+        binding.groupWaitReady.visibility = View.GONE
         beginCountdown()
+    }
+
+    private fun stopReadyListening() {
+        vadRunning = false
+        stopSpeechRecognizer()
     }
 
     // ---------------- 开赛倒计时 ----------------
@@ -274,8 +458,9 @@ class CountActivity : AppCompatActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQ_CAMERA) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                beginCountdown()
+            val idx = permissions.indexOf(Manifest.permission.CAMERA)
+            if (idx >= 0 && grantResults.getOrNull(idx) == PackageManager.PERMISSION_GRANTED) {
+                enterWaitReady()
             } else {
                 Toast.makeText(this, R.string.toast_camera_denied, Toast.LENGTH_LONG).show()
             }
@@ -405,7 +590,7 @@ class CountActivity : AppCompatActivity() {
 
         updateCountUi()
         updateTimeUi()
-        if (binding.switchSensor.isChecked) startCamera()
+        startCamera()
         speakParts(listOf(R.raw.say_start))
         handler.post(ticker)
     }
@@ -491,6 +676,9 @@ class CountActivity : AppCompatActivity() {
 
     private fun resetToSetup() {
         stopCamera()
+        stopReadyListening()
+        waitingReady = false
+        binding.groupWaitReady.visibility = View.GONE
         count = 0
         accumulatedMs = 0L
         finished = false
@@ -659,6 +847,8 @@ class CountActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         handler.removeCallbacks(ticker)
+        waitingReady = false
+        stopReadyListening()
         stopCamera()
         analysisExecutor?.shutdown()
         analysisExecutor = null
